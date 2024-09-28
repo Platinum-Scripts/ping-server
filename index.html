@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,10 +8,8 @@
         /* Container for grid layout */
         #ping-results {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            /* Four equal columns */
-            gap: 20px;
-            /* Add some space between the columns */
+            grid-template-columns: repeat(4, 1fr); /* Four equal columns */
+            gap: 20px; /* Add some space between the columns */
             padding: 20px;
         }
 
@@ -33,10 +30,8 @@
         ul {
             list-style-type: none;
             padding-left: 0;
-            max-height: 200px;
-            /* Max height to prevent overflow */
-            overflow-y: auto;
-            /* Scroll if list gets too long */
+            max-height: 200px; /* Max height to prevent overflow */
+            overflow-y: auto;  /* Scroll if list gets too long */
         }
 
         ul li {
@@ -47,48 +42,107 @@
         p {
             font-weight: bold;
             text-align: center;
-            margin-top: 10px;
-            /* Ensure margin to separate from list */
+            margin-top: 10px; /* Ensure margin to separate from list */
+        }
+
+        /* Explanation section */
+        #explanation {
+            margin: 20px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            background-color: #f5f5f5;
+            text-align: center;
+        }
+
+        /* Export button styling */
+        #export-btn {
+            display: block;
+            margin: 20px auto;
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: not-allowed;
+            opacity: 0.5;
+            position: relative;
+        }
+
+        /* Tooltip container */
+        #export-btn:hover::after {
+            content: attr(data-hover);
+            position: absolute;
+            bottom: -35px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #333;
+            color: #fff;
+            padding: 5px;
+            border-radius: 5px;
+            font-size: 12px;
+            white-space: nowrap;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+            visibility: hidden;
+        }
+
+        /* Show tooltip when hovered */
+        #export-btn:hover:enabled::after {
+            visibility: hidden;
+        }
+
+        #export-btn:hover:disabled::after {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        #export-btn:enabled {
+            cursor: pointer;
+            opacity: 1;
         }
     </style>
 </head>
-
 <body>
     <h1>Ping Test Results</h1>
+
+    <!-- Explanation Section -->
+    <div id="explanation">
+        <h3>Why are we doing this?</h3>
+        <p>
+            We are conducting this test to determine the best location to host our FiveM server for optimal performance.
+            By measuring your connection to different server regions (Chicago, Dallas, Miami, and New York), we can determine which location offers the lowest latency.
+        </p>
+        <p>
+            All data collected is confidential and secure. No private information is collected or stored; only non-identifiable information such as your connection speed to these servers is used.
+        </p>
+    </div>
+
     <p id="location-info">Detecting your location...</p>
     <div id="ping-results"></div>
+    <button id="export-btn" data-hover="You need 600 pings to enable export" disabled>Export Pings to JSON</button>
 
     <script>
+        let userLocation = '';
+        let userLat = '';
+        let userLon = '';
+
         // Servers and their coordinates for distance calculation
         const servers = {
-            'Chicago': {
-                url: 'http://ping.chi.scdb.gg',
-                lat: 41.8781,
-                lon: -87.6298
-            },
-            'Dallas': {
-                url: 'http://ping.dal.scdb.gg',
-                lat: 32.7767,
-                lon: -96.7970
-            },
-            'Miami': {
-                url: 'http://ping.mia.scdb.gg',
-                lat: 25.7617,
-                lon: -80.1918
-            },
-            'New York': {
-                url: 'http://ping.nyc.scdb.gg',
-                lat: 40.7128,
-                lon: -74.0060
-            }
+            'Chicago': { url: 'http://ping.chi.scdb.gg', lat: 41.8781, lon: -87.6298, pings: [] },
+            'Dallas': { url: 'http://ping.dal.scdb.gg', lat: 32.7767, lon: -96.7970, pings: [] },
+            'Miami': { url: 'http://ping.mia.scdb.gg', lat: 25.7617, lon: -80.1918, pings: [] },
+            'New York': { url: 'http://ping.nyc.scdb.gg', lat: 40.7128, lon: -74.0060, pings: [] }
         };
 
         const resultsElement = document.getElementById('ping-results');
-        const pingResults = {}; // Store ping results for each server
+        const exportBtn = document.getElementById('export-btn');
+        const totalPings = 600;
 
         // Initialize results storage and display containers for each server
         for (const name in servers) {
-            pingResults[name] = [];
             createServerSection(name);
         }
 
@@ -123,17 +177,15 @@
         async function pingServerHTTP(name, url) {
             const startTime = Date.now(); // Record the time before the request
             try {
-                const response = await fetch(url, {
-                    method: 'GET',
-                    mode: 'cors'
-                });
+                const response = await fetch(url, { method: 'GET', mode: 'cors' });
                 if (response.ok) {
                     const endTime = Date.now(); // Record the time after the response is received
                     const ping = endTime - startTime; // Calculate the time difference (ping)
-                    pingResults[name].push(ping); // Store the ping result
-                    if (pingResults[name].length > 600) pingResults[name]
-                .shift(); // Keep only the last 600 pings (5 mins of data at 5-second intervals)
+                    servers[name].pings.push(ping); // Store the ping result
+                    if (servers[name].pings.length > totalPings) servers[name].pings.shift(); // Keep only the last 600 pings
                     updateResults(name); // Update the results in real-time
+
+                    checkExportAvailability(); // Check if export should be enabled
                 } else {
                     appendPing(name, 'Failed to ping');
                 }
@@ -149,7 +201,7 @@
             // Sort the pings
             const sortedPings = [...pings].sort((a, b) => a - b);
 
-            // Remove the top 10% and bottom 10% (for 600 values, this is the top and bottom six)
+            // Remove the top 10% and bottom 10% (for 600 values, this is the top and bottom 60)
             const trimCount = Math.floor(sortedPings.length * 0.1); // 10% trimming
             const trimmedPings = sortedPings.slice(trimCount, sortedPings.length - trimCount);
 
@@ -160,7 +212,7 @@
 
         // Function to update the displayed results
         function updateResults(name) {
-            const pings = pingResults[name];
+            const pings = servers[name].pings;
             const averagePing = calculateAverageWithoutOutliers(pings);
             const list = document.getElementById(`ping-list-${name}`);
             const average = document.getElementById(`average-${name}`);
@@ -183,12 +235,44 @@
             list.appendChild(li);
         }
 
+        // Check if we can enable the export button (only when all servers have 600 pings)
+        function checkExportAvailability() {
+            const allServersReachedLimit = Object.values(servers).every(server => server.pings.length >= totalPings);
+            if (allServersReachedLimit) {
+                exportBtn.disabled = false;
+                exportBtn.style.cursor = 'pointer';
+            }
+        }
+
+        // Function to export pings and location data to a JSON file
+        function exportToJson() {
+            const exportData = {
+                location: userLocation,
+                servers: {}
+            };
+
+            // Add ping data for each server
+            for (const [name, server] of Object.entries(servers)) {
+                exportData.servers[name] = {
+                    distance: document.getElementById(`distance-${name}`).textContent,
+                    pings: server.pings
+                };
+            }
+
+            const jsonString = JSON.stringify(exportData, null, 2); // Pretty-print the JSON
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'pings.json';
+            link.click();
+        }
+
         // Function to calculate the distance between two lat/lon pairs using the Haversine formula
         function calculateDistance(lat1, lon1, lat2, lon2) {
             const R = 3958.8; // Radius of the Earth in miles
             const dLat = (lat2 - lat1) * (Math.PI / 180);
             const dLon = (lon2 - lon1) * (Math.PI / 180);
-            const a =
+            const a = 
                 Math.sin(dLat / 2) * Math.sin(dLat / 2) +
                 Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
                 Math.sin(dLon / 2) * Math.sin(dLon / 2);
@@ -202,13 +286,12 @@
             try {
                 const response = await fetch('http://ip-api.com/json'); // IP-based location API
                 const data = await response.json();
-
+                
                 if (data.status === 'success') {
-                    const userLat = data.lat;
-                    const userLon = data.lon;
-                    const userLocation =
-                    `${data.regionName}, ${data.country}`; // Only show state/region and country
-
+                    userLat = data.lat;
+                    userLon = data.lon;
+                    userLocation = `${data.regionName}, ${data.country}`; // Only show state/region and country
+                    
                     document.getElementById('location-info').textContent = `Your location: ${userLocation}`;
 
                     for (const [name, server] of Object.entries(servers)) {
@@ -235,7 +318,9 @@
         // Start the IP-based geolocation and ping process
         getLocationAndCalculateDistances();
         startPinging(); // Start the pinging process
+
+        // Set up the export button
+        exportBtn.addEventListener('click', exportToJson);
     </script>
 </body>
-
 </html>
