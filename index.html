@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ping Test</title>
+    <style>
+        /* Container for grid layout */
+        #ping-results {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr); /* Four equal columns */
+            gap: 20px; /* Add some space between the columns */
+            padding: 20px;
+        }
+
+        /* Styling for each server section */
+        .server-section {
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            padding: 10px;
+            background-color: #f9f9f9;
+        }
+
+        h2 {
+            text-align: center;
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+
+        ul {
+            list-style-type: none;
+            padding-left: 0;
+            max-height: 200px; /* Max height to prevent overflow */
+            overflow-y: auto;  /* Scroll if list gets too long */
+        }
+
+        ul li {
+            padding: 5px 0;
+            border-bottom: 1px solid #ddd;
+        }
+
+        p {
+            font-weight: bold;
+            text-align: center;
+            margin-top: 10px; /* Ensure margin to separate from list */
+        }
+    </style>
+</head>
+<body>
+    <h1>Ping Test Results</h1>
+    <div id="ping-results"></div>
+
+    <script>
+        // Servers to ping using HTTP
+        const servers = {
+            'Chicago': 'http://ping.chi.scdb.gg',
+            'Dallas': 'http://ping.dal.scdb.gg',
+            'Miami': 'http://ping.mia.scdb.gg',
+            'New York': 'http://ping.nyc.scdb.gg'
+        };
+
+        const resultsElement = document.getElementById('ping-results');
+        const pingResults = {}; // Store ping results for each server
+
+        // Initialize results storage and display containers for each server
+        for (const name in servers) {
+            pingResults[name] = [];
+            createServerSection(name);
+        }
+
+        // Function to create a section for each server
+        function createServerSection(name) {
+            const section = document.createElement('div');
+            section.classList.add('server-section'); // Add class for styling
+
+            const header = document.createElement('h2');
+            header.textContent = `${name} Ping Results`;
+
+            const average = document.createElement('p');
+            average.id = `average-${name}`;
+            average.textContent = `Average: calculating...`;
+
+            const list = document.createElement('ul');
+            list.id = `ping-list-${name}`;
+
+            section.appendChild(header);
+            section.appendChild(average); // Average is below the header but above the list
+            section.appendChild(list);
+
+            resultsElement.appendChild(section);
+        }
+
+        // Function to ping a server using HTTP
+        async function pingServerHTTP(name, url) {
+            const startTime = Date.now(); // Record the time before the request
+            try {
+                const response = await fetch(url, { method: 'GET', mode: 'cors' });
+                if (response.ok) {
+                    const endTime = Date.now(); // Record the time after the response is received
+                    const ping = endTime - startTime; // Calculate the time difference (ping)
+                    pingResults[name].push(ping); // Store the ping result
+                    if (pingResults[name].length > 600) pingResults[name].shift(); // Keep only the last 600 pings (5 mins of data at 5-second intervals)
+                    updateResults(name); // Update the results in real-time
+                } else {
+                    appendPing(name, 'Failed to ping');
+                }
+            } catch (error) {
+                appendPing(name, 'Failed to ping');
+            }
+        }
+
+        // Function to calculate the average ping for a server after removing outliers
+        function calculateAverageWithoutOutliers(pings) {
+            if (pings.length <= 2) return pings.length > 0 ? pings[0] : 0; // If only 1-2 pings, return the raw average
+
+            // Sort the pings
+            const sortedPings = [...pings].sort((a, b) => a - b);
+
+            // Remove the top 10% and bottom 10% (for 600 values, this is the top and bottom six)
+            const trimCount = Math.floor(sortedPings.length * 0.1); // 10% trimming
+            const trimmedPings = sortedPings.slice(trimCount, sortedPings.length - trimCount);
+
+            // Calculate the average of the remaining pings
+            const sum = trimmedPings.reduce((a, b) => a + b, 0);
+            return (sum / trimmedPings.length).toFixed(2);
+        }
+
+        // Function to update the displayed results
+        function updateResults(name) {
+            const pings = pingResults[name];
+            const averagePing = calculateAverageWithoutOutliers(pings);
+            const list = document.getElementById(`ping-list-${name}`);
+            const average = document.getElementById(`average-${name}`);
+
+            // Update the average display
+            average.textContent = `Average (without outliers): ${averagePing} ms (Last ${pings.length} pings)`;
+
+            // Clear and re-populate the list only when new pings are added
+            if (pings.length > 0) {
+                const newPing = pings[pings.length - 1];
+                appendPing(name, `${pings.length}: ${newPing} ms`);
+            }
+        }
+
+        // Function to append a single ping result to the list without clearing
+        function appendPing(name, pingText) {
+            const list = document.getElementById(`ping-list-${name}`);
+            const li = document.createElement('li');
+            li.textContent = pingText;
+            list.appendChild(li);
+        }
+
+        // Ping each server every 5 seconds, but with a 1-second delay between servers
+        async function startPinging() {
+            let delay = 0;
+            for (const [name, url] of Object.entries(servers)) {
+                setInterval(() => pingServerHTTP(name, url), 5000 + delay);
+                delay += 1000; // Add 1-second delay between each server's requests
+            }
+        }
+
+        startPinging(); // Start the pinging process
+    </script>
+</body>
+</html>
