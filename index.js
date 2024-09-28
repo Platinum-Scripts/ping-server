@@ -1,10 +1,9 @@
-// BunJS Server: index.js
-import { serve, WebSocketServer } from 'bun';
+// BunJS Server: ping-server.js
+import { serve } from 'bun';
 
-// WebSocket and HTTP Ping Server on the same port 8080
 const server = serve({
   fetch(request) {
-    // Return the current timestamp as a response for HTTP pings
+    // Return the current timestamp as a response, including CORS headers
     return new Response(Date.now().toString(), {
       headers: {
         "Access-Control-Allow-Origin": "*", // Allow requests from any origin
@@ -13,16 +12,7 @@ const server = serve({
       },
     });
   },
-  websocket: {
-    message(ws, message) {
-      const startTime = Date.now();
-      // When receiving a ping message, respond with the current timestamp
-      if (message === 'ping') {
-        ws.send(JSON.stringify({ timestamp: startTime }));
-      }
-    },
-  },
-  port: 8080, // Both HTTP and WebSocket will run on port 8080
+  port: 80, // Set port to 80
 });
 
-console.log(`Server running on http://localhost:${server.port} for HTTP and WS`);
+console.log(`Server running on http://localhost:${server.port}`);
