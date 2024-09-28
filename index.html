@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,8 +9,10 @@
         /* Container for grid layout */
         #ping-results {
             display: grid;
-            grid-template-columns: repeat(4, 1fr); /* Four equal columns */
-            gap: 20px; /* Add some space between the columns */
+            grid-template-columns: repeat(4, 1fr);
+            /* Four equal columns */
+            gap: 20px;
+            /* Add some space between the columns */
             padding: 20px;
         }
 
@@ -30,8 +33,10 @@
         ul {
             list-style-type: none;
             padding-left: 0;
-            max-height: 200px; /* Max height to prevent overflow */
-            overflow-y: auto;  /* Scroll if list gets too long */
+            max-height: 200px;
+            /* Max height to prevent overflow */
+            overflow-y: auto;
+            /* Scroll if list gets too long */
         }
 
         ul li {
@@ -42,21 +47,40 @@
         p {
             font-weight: bold;
             text-align: center;
-            margin-top: 10px; /* Ensure margin to separate from list */
+            margin-top: 10px;
+            /* Ensure margin to separate from list */
         }
     </style>
 </head>
+
 <body>
     <h1>Ping Test Results</h1>
+    <p id="location-info">Detecting your location...</p>
     <div id="ping-results"></div>
 
     <script>
-        // Servers to ping using HTTP
+        // Servers and their coordinates for distance calculation
         const servers = {
-            'Chicago': 'http://ping.chi.scdb.gg',
-            'Dallas': 'http://ping.dal.scdb.gg',
-            'Miami': 'http://ping.mia.scdb.gg',
-            'New York': 'http://ping.nyc.scdb.gg'
+            'Chicago': {
+                url: 'http://ping.chi.scdb.gg',
+                lat: 41.8781,
+                lon: -87.6298
+            },
+            'Dallas': {
+                url: 'http://ping.dal.scdb.gg',
+                lat: 32.7767,
+                lon: -96.7970
+            },
+            'Miami': {
+                url: 'http://ping.mia.scdb.gg',
+                lat: 25.7617,
+                lon: -80.1918
+            },
+            'New York': {
+                url: 'http://ping.nyc.scdb.gg',
+                lat: 40.7128,
+                lon: -74.0060
+            }
         };
 
         const resultsElement = document.getElementById('ping-results');
@@ -80,11 +104,16 @@
             average.id = `average-${name}`;
             average.textContent = `Average: calculating...`;
 
+            const distance = document.createElement('p');
+            distance.id = `distance-${name}`;
+            distance.textContent = `Distance: calculating...`;
+
             const list = document.createElement('ul');
             list.id = `ping-list-${name}`;
 
             section.appendChild(header);
             section.appendChild(average); // Average is below the header but above the list
+            section.appendChild(distance); // Distance below the average
             section.appendChild(list);
 
             resultsElement.appendChild(section);
@@ -94,12 +123,16 @@
         async function pingServerHTTP(name, url) {
             const startTime = Date.now(); // Record the time before the request
             try {
-                const response = await fetch(url, { method: 'GET', mode: 'cors' });
+                const response = await fetch(url, {
+                    method: 'GET',
+                    mode: 'cors'
+                });
                 if (response.ok) {
                     const endTime = Date.now(); // Record the time after the response is received
                     const ping = endTime - startTime; // Calculate the time difference (ping)
                     pingResults[name].push(ping); // Store the ping result
-                    if (pingResults[name].length > 600) pingResults[name].shift(); // Keep only the last 600 pings (5 mins of data at 5-second intervals)
+                    if (pingResults[name].length > 600) pingResults[name]
+                .shift(); // Keep only the last 600 pings (5 mins of data at 5-second intervals)
                     updateResults(name); // Update the results in real-time
                 } else {
                     appendPing(name, 'Failed to ping');
@@ -150,16 +183,59 @@
             list.appendChild(li);
         }
 
+        // Function to calculate the distance between two lat/lon pairs using the Haversine formula
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 3958.8; // Radius of the Earth in miles
+            const dLat = (lat2 - lat1) * (Math.PI / 180);
+            const dLon = (lon2 - lon1) * (Math.PI / 180);
+            const a =
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            const distance = R * c;
+            return distance.toFixed(2);
+        }
+
+        // Function to get user's location via IP and calculate distances to server regions
+        async function getLocationAndCalculateDistances() {
+            try {
+                const response = await fetch('http://ip-api.com/json'); // IP-based location API
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    const userLat = data.lat;
+                    const userLon = data.lon;
+                    const userLocation =
+                    `${data.regionName}, ${data.country}`; // Only show state/region and country
+
+                    document.getElementById('location-info').textContent = `Your location: ${userLocation}`;
+
+                    for (const [name, server] of Object.entries(servers)) {
+                        const distance = calculateDistance(userLat, userLon, server.lat, server.lon);
+                        document.getElementById(`distance-${name}`).textContent = `Distance: ${distance} miles`;
+                    }
+                } else {
+                    document.getElementById('location-info').textContent = 'Unable to retrieve location.';
+                }
+            } catch (error) {
+                document.getElementById('location-info').textContent = 'Error fetching location.';
+            }
+        }
+
         // Ping each server every 5 seconds, but with a 1-second delay between servers
         async function startPinging() {
             let delay = 0;
-            for (const [name, url] of Object.entries(servers)) {
-                setInterval(() => pingServerHTTP(name, url), 5000 + delay);
+            for (const [name, server] of Object.entries(servers)) {
+                setInterval(() => pingServerHTTP(name, server.url), 5000 + delay);
                 delay += 1000; // Add 1-second delay between each server's requests
             }
         }
 
+        // Start the IP-based geolocation and ping process
+        getLocationAndCalculateDistances();
         startPinging(); // Start the pinging process
     </script>
 </body>
+
 </html>
