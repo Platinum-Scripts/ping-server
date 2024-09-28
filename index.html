@@ -146,14 +146,14 @@
 
     <p id="location-info">Detecting your location...</p>
     <div id="ping-results"></div>
-    <button id="export-btn" data-hover="You need 600 pings to enable export" disabled>Export Pings to JSON</button>
+    <button id="export-btn" data-hover="You need 60 pings to enable export" disabled>Export Pings to JSON</button>
 
     <script>
         let userLocation = '';
         let userLat = '';
         let userLon = '';
 
-        const totalPings = 600; // Total number of pings to collect
+        const totalPings = 60; // Total number of pings to collect
         const pingInterval = 1000 / 4; // 4 pings per second (1000ms / 4 = 250ms between each ping)
 
         // Servers and their coordinates for distance calculation
@@ -210,7 +210,7 @@
                     const endTime = Date.now(); // Record the time after the response is received
                     const ping = endTime - startTime; // Calculate the time difference (ping)
                     servers[name].pings.push(ping); // Store the ping result
-                    if (servers[name].pings.length > totalPings) servers[name].pings.shift(); // Keep only the last 600 pings
+                    if (servers[name].pings.length > totalPings) servers[name].pings.shift(); // Keep only the last 60 pings
                     updateResults(name); // Update the results in real-time
 
                     updateProgressBarAndTimer(); // Update progress bar and timer
@@ -231,7 +231,7 @@
             // Sort the pings
             const sortedPings = [...pings].sort((a, b) => a - b);
 
-            // Remove the top 10% and bottom 10% (for 600 values, this is the top and bottom 60)
+            // Remove the top 10% and bottom 10% (for 60 values, this is the top and bottom 60)
             const trimCount = Math.floor(sortedPings.length * 0.1); // 10% trimming
             const trimmedPings = sortedPings.slice(trimCount, sortedPings.length - trimCount);
 
@@ -281,7 +281,7 @@
             timerElement.textContent = `Estimated time remaining: ${minutes}m ${seconds}s`;
         }
 
-        // Check if we can enable the export button (only when all servers have 600 pings)
+        // Check if we can enable the export button (only when all servers have 60 pings)
         function checkExportAvailability() {
             const allServersReachedLimit = Object.values(servers).every(server => server.pings.length >= totalPings);
             if (allServersReachedLimit) {
